@@ -1,2 +1,4 @@
-def test_math():
-    assert 2 + 2 == 4
+from app import hello
+
+def test_hello():
+    assert hello() == "Hello World"
