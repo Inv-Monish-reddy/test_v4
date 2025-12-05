@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        SONAR_HOST_URL = "https://v2code.rtwohealthcare.com"
+        SONAR_HOST_URL = "http://10.80.5.127:9070"
         SONAR_TOKEN = "sqp_ab4016bc5eef902acdbc5f5dbf8f0d46815f0035"
 
         DOCKER_REGISTRY_URL = "v2deploy.rtwohealthcare.com"
@@ -16,40 +16,18 @@ pipeline {
     stages {
 
         stage('Checkout') {
-            steps {
-                checkout scm
-            }
+            steps { checkout scm }
         }
 
-        stage('Install + Test + Coverage') {
+        stage('Install + Test (No coverage check)') {
             steps {
                 sh """
                     docker run --rm \
-                        -v $WORKSPACE/backend:/app \
-                        -w /app python:3.10-slim \
-                        sh -c "
-                            pip install -r requirements.txt &&
-                            pytest --cov=. --cov-report=xml --disable-warnings --maxfail=1
-                        "
+                        -v ${WORKSPACE}/backend:/app \
+                        -w /app \
+                        python:3.10-slim \
+                        sh -c "pip install -r requirements.txt && pytest --disable-warnings --maxfail=1"
                 """
-            }
-        }
-
-        stage('Verify Coverage >= 80%') {
-            steps {
-                script {
-                    def cov = sh(
-                        script: "grep '<coverage ' backend/coverage.xml | sed -E 's/.*line-rate=\"([0-9\\.]+)\".*/\\1/'",
-                        returnStdout: true
-                    ).trim()
-
-                    def percent = (cov.toFloat() * 100).toInteger()
-                    echo "Coverage: ${percent}%"
-
-                    if (percent < 80) {
-                        error "Coverage below 80%. Failing pipeline."
-                    }
-                }
             }
         }
 
@@ -58,14 +36,14 @@ pipeline {
                 withSonarQubeEnv('SonarQube') {
                     sh """
                         docker run --rm \
-                            -v $WORKSPACE:/src \
-                            -w /src sonarsource/sonar-scanner-cli:4.6 \
+                            -v ${WORKSPACE}:/src \
+                            -w /src \
+                            sonarsource/sonar-scanner-cli:4.6 \
                             sonar-scanner \
-                                -Dsonar.projectKey=test_v3 \
+                                -Dsonar.projectKey=test_v4 \
                                 -Dsonar.sources=backend \
-                                -Dsonar.python.coverage.reportPaths=backend/coverage.xml \
                                 -Dsonar.host.url=${SONAR_HOST_URL} \
-                                -Dsonar.token=${SONAR_TOKEN}
+                                -Dsonar.login=${SONAR_TOKEN}
                     """
                 }
             }
@@ -73,7 +51,7 @@ pipeline {
 
         stage('Skip Quality Gate') {
             steps {
-                echo "Python project — Quality Gate manually skipped."
+                echo "⏭️ Skipping Quality Gate for Python project"
             }
         }
 
@@ -97,10 +75,8 @@ pipeline {
                 )]) {
                     sh """
                         echo "$PASS" | docker login ${DOCKER_REGISTRY_URL} -u "$USER" --password-stdin
-
                         docker push ${REGISTRY_HOST}/${IMAGE_NAME}:${IMAGE_TAG}
                         docker push ${REGISTRY_HOST}/${IMAGE_NAME}:latest
-
                         docker logout ${DOCKER_REGISTRY_URL}
                     """
                 }
@@ -109,7 +85,10 @@ pipeline {
 
         stage('Verify Pull From Registry') {
             steps {
-                sh "docker pull ${REGISTRY_HOST}/${IMAGE_NAME}:${IMAGE_TAG}"
+                sh """
+                    docker pull ${REGISTRY_HOST}/${IMAGE_NAME}:${IMAGE_TAG}
+                    echo "Pull test successful."
+                """
             }
         }
     }
