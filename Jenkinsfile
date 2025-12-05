@@ -59,7 +59,7 @@ pipeline {
                            -v \$PWD:/src \
                            -w /src sonarsource/sonar-scanner-cli:4.6 \
                            sonar-scanner \
-                               -Dsonar.projectKey=test_v4 \
+                               -Dsonar.projectKey=test_v3 \
                                -Dsonar.sources=backend \
                                -Dsonar.host.url=${SONAR_HOST_URL} \
                                -Dsonar.login=${SONAR_TOKEN}
