@@ -38,7 +38,7 @@ pipeline {
                         docker run --rm --network=host \
                             -v ${WORKSPACE}:/src \
                             -w /src \
-                            sonarsource/sonar-scanner-cli:4.6 \
+                            sonarsource/sonar-scanner-cli:5 \
                             sonar-scanner \
                                 -Dsonar.projectKey=test_v3 \
                                 -Dsonar.sources=backend \
