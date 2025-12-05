@@ -2,103 +2,120 @@ pipeline {
     agent any
 
     environment {
-        SONAR_HOST_URL = "http://v2code.rtwohealthcare.com"
-        SONAR_TOKEN = "sqp_ab4016bc5eef902acdbc5f5dbf8f0d46815f0035"
+        SONAR_HOST_URL = "https://v2code.rtwohealthcare.com"   // FIXED
+        SONAR_TOKEN    = "sqp_ab4016bc5eef902acdbc5f5dbf8f0d46815f0035"
 
-        DOCKER_REGISTRY = "v2deploy.rtwohealthcare.com"
+        DOCKER_REGISTRY_URL = "v2deploy.rtwohealthcare.com"
         IMAGE_NAME = "test-v4"
-        IMAGE_TAG = "v${BUILD_NUMBER}"
+        IMAGE_TAG  = "v${BUILD_NUMBER}"
     }
 
     stages {
 
-        stage("Checkout") {
-            steps { checkout scm }
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
         }
 
-        stage("Install & Test Python Code") {
+        stage('Install & Test Python Code') {
             steps {
                 sh """
                     docker run --rm \
-                        -v ${WORKSPACE}/backend:/app \
-                        -w /app python:3.10-slim \
-                        sh -c "
-                            pip install --upgrade pip &&
+                        -v \$PWD/backend:/app \
+                        -w /app python:3.10-slim sh -c "
                             pip install -r requirements.txt &&
-                            pytest --disable-warnings --maxfail=1 -q || true
+                            pytest --cov=. --cov-report=term --disable-warnings --maxfail=1
                         "
                 """
             }
         }
 
-        stage("SonarQube Analysis") {
+        stage('Verify Coverage >= 80%') {
             steps {
-                echo "⚡ Running Sonar Scan (errors will NOT fail pipeline)"
-
                 script {
-                    try {
-                        sh """
-                            docker run --rm \
-                                -v ${WORKSPACE}:/src \
-                                -w /src sonarsource/sonar-scanner-cli:4.6 \
-                                sonar-scanner \
-                                    -Dsonar.projectKey=test_v3 \
-                                    -Dsonar.sources=backend \
-                                    -Dsonar.host.url=${SONAR_HOST_URL} \
-                                    -Dsonar.login=${SONAR_TOKEN}
-                        """
-                    } catch (err) {
-                        echo "❌ Sonar failed but skipping (server unreachable)"
+                    def cov = sh(
+                        script: "docker run --rm -v \$PWD/backend:/app -w /app python:3.10-slim \
+                                 sh -c \"pytest --cov=. --cov-report=term 2>&1 | grep 'TOTAL' | awk '{print \$4}'\"",
+                        returnStdout: true
+                    ).trim().replace('%','')
+
+                    cov = cov as Integer
+
+                    if (cov < 80) {
+                        error "❌ Code coverage is ${cov}% — BELOW required 80%"
+                    } else {
+                        echo "✅ Coverage OK: ${cov}%"
                     }
                 }
             }
         }
 
-        stage("Skip Quality Gate") {
-            steps { echo "⏭️ Quality Gate skipped (Python project)." }
-        }
-
-        stage("Docker Build") {
+        stage('SonarQube Analysis') {
             steps {
-                sh """
-                    cd backend
-
-                    docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
-
-                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
-                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${DOCKER_REGISTRY}/${IMAGE_NAME}:latest
-                """
-            }
-        }
-
-        stage("Docker Push") {
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: "nexus-docker-cred",
-                    usernameVariable: "USER",
-                    passwordVariable: "PASS"
-                )]) {
+                withSonarQubeEnv("SonarQube") {
                     sh """
-                        echo "${PASS}" | docker login ${DOCKER_REGISTRY} -u "${USER}" --password-stdin
-                        docker push ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
-                        docker push ${DOCKER_REGISTRY}/${IMAGE_NAME}:latest
-                        docker logout ${DOCKER_REGISTRY}
+                        docker run --rm \
+                           -v \$PWD:/src \
+                           -w /src sonarsource/sonar-scanner-cli:4.6 \
+                           sonar-scanner \
+                               -Dsonar.projectKey=test_v4 \
+                               -Dsonar.sources=backend \
+                               -Dsonar.host.url=${SONAR_HOST_URL} \
+                               -Dsonar.login=${SONAR_TOKEN}
                     """
                 }
             }
         }
 
-        stage("Verify Pull From Registry") {
+        stage('Skip Quality Gate') {
+            steps {
+                echo "⏭️ Skipping QG intentionally for Python project."
+            }
+        }
+
+        stage('Docker Build') {
             steps {
                 sh """
-                    docker pull ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
+                    cd backend
+                    docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${DOCKER_REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG}
+                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${DOCKER_REGISTRY_URL}/${IMAGE_NAME}:latest
+                """
+            }
+        }
+
+        stage('Docker Push') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'nexus-docker-cred',
+                    usernameVariable: 'USER',
+                    passwordVariable: 'PASS'
+                )]) {
+                    sh """
+                        echo "$PASS" | docker login ${DOCKER_REGISTRY_URL} -u "$USER" --password-stdin
+
+                        docker push ${DOCKER_REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG}
+                        docker push ${DOCKER_REGISTRY_URL}/${IMAGE_NAME}:latest
+
+                        docker logout ${DOCKER_REGISTRY_URL}
+                    """
+                }
+            }
+        }
+
+        stage('Verify Pull From Registry') {
+            steps {
+                sh """
+                    docker pull ${DOCKER_REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG}
                 """
             }
         }
     }
 
     post {
-        success { echo "🎉 Pipeline SUCCESS!" }
-        failure { echo "❌ Pipeline FAILED — Fix errors." }
-    }
-}
+        failure {
+            echo "❌ Pipeline FAILED — Fix errors."
+        }
+        success {
+            echo "✅ Pipeline SUCCESS — All steps passed."
