@@ -1,0 +1,257 @@
+/**
+ * Animation Calculator - Stylesheet
+ * Modern, responsive design with smooth animations
+ */
+
+/* Reset and Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+.container {
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    max-width: 500px;
+    width: 100%;
+    padding: 40px;
+    animation: slideIn 0.5s ease-out;
+}
+
+/* Slide-in animation for container */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Header Styles */
+header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+h1 {
+    color: #333;
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+}
+
+.subtitle {
+    color: #666;
+    font-size: 1rem;
+}
+
+/* Calculator Form */
+.calculator-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+label {
+    color: #333;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+input[type="number"],
+select {
+    padding: 12px 15px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    outline: none;
+}
+
+input[type="number"]:focus,
+select:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+input[type="number"]:hover,
+select:hover {
+    border-color: #667eea;
+}
+
+/* Calculate Button */
+.btn-calculate {
+    margin-top: 10px;
+    padding: 15px 30px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    overflow: hidden;
+    position: relative;
+}
+
+.btn-calculate:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+}
+
+.btn-calculate:active {
+    transform: translateY(0);
+}
+
+.btn-text {
+    position: relative;
+    z-index: 1;
+}
+
+/* Result Container */
+.result-container {
+    margin-top: 30px;
+    padding: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    text-align: center;
+    animation: fadeIn 0.5s ease-out;
+}
+
+.result-box {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.result-label {
+    color: white;
+    font-weight: 600;
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.result-value {
+    color: white;
+    font-size: 2.5rem;
+    font-weight: bold;
+    animation: scaleIn 0.5s ease-out;
+}
+
+/* Error Container */
+.error-container {
+    margin-top: 30px;
+    padding: 20px;
+    background: #fff3cd;
+    border: 2px solid #ffc107;
+    border-radius: 12px;
+    animation: fadeIn 0.5s ease-out;
+}
+
+.error-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.error-icon {
+    font-size: 1.5rem;
+}
+
+.error-message {
+    color: #856404;
+    font-weight: 600;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes scaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.5);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes shake {
+    0%, 100% {
+        transform: translateX(0);
+    }
+    10%, 30%, 50%, 70%, 90% {
+        transform: translateX(-10px);
+    }
+    20%, 40%, 60%, 80% {
+        transform: translateX(10px);
+    }
+}
+
+/* Utility Classes */
+.hidden {
+    display: none;
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease-out;
+}
+
+.shake {
+    animation: shake 0.5s ease-out;
+}
+
+/* Footer */
+footer {
+    margin-top: 30px;
+    text-align: center;
+    color: #999;
+    font-size: 0.9rem;
+}
+
+/* Responsive Design */
+@media (max-width: 600px) {
+    .container {
+        padding: 30px 20px;
+    }
+
+    h1 {
+        font-size: 2rem;
+    }
+
+    .result-value {
+        font-size: 2rem;
+    }
+}
