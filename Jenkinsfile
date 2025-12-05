@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        SONAR_HOST_URL = "http://10.80.5.127:9070"
+        SONAR_HOST_URL = "https://v2code.rtwohealthcare.com"
         SONAR_TOKEN = "sqp_ab4016bc5eef902acdbc5f5dbf8f0d46815f0035"
 
         DOCKER_REGISTRY_URL = "v2deploy.rtwohealthcare.com"
@@ -19,7 +19,7 @@ pipeline {
             steps { checkout scm }
         }
 
-        stage('Install + Test (No coverage check)') {
+        stage('Install + Test (No Coverage Check)') {
             steps {
                 sh """
                     docker run --rm \
@@ -35,15 +35,15 @@ pipeline {
             steps {
                 withSonarQubeEnv('SonarQube') {
                     sh """
-                        docker run --rm \
+                        docker run --rm --network=host \
                             -v ${WORKSPACE}:/src \
                             -w /src \
                             sonarsource/sonar-scanner-cli:4.6 \
                             sonar-scanner \
                                 -Dsonar.projectKey=test_v3 \
-                                -Dsonar.sources=. \
-                                -Dsonar.host.url=https://v2code.rtwohealthcare.com \
-                                -Dsonar.token=sqp_ab4016bc5eef902acdbc5f5dbf8f0d46815f0035
+                                -Dsonar.sources=backend \
+                                -Dsonar.host.url=${SONAR_HOST_URL} \
+                                -Dsonar.token=${SONAR_TOKEN}
                     """
                 }
             }
@@ -51,7 +51,7 @@ pipeline {
 
         stage('Skip Quality Gate') {
             steps {
-                echo "⏭️ Skipping Quality Gate for Python project"
+                echo "Skipping Quality Gate for Python project"
             }
         }
 
