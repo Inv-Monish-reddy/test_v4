@@ -2,30 +2,20 @@ pipeline {
     agent any
 
     environment {
-        // ==== SONAR ====
         SONAR_HOST_URL = "http://v2code.rtwohealthcare.com"
         SONAR_TOKEN = "sqp_ab4016bc5eef902acdbc5f5dbf8f0d46815f0035"
 
-        // ==== DOCKER SETTINGS ====
         DOCKER_REGISTRY = "v2deploy.rtwohealthcare.com"
-        IMAGE_NAME = "test-v3"
+        IMAGE_NAME = "test-v4"
         IMAGE_TAG = "v${BUILD_NUMBER}"
     }
 
     stages {
 
-        /* ===============================
-               CHECKOUT
-        =============================== */
         stage("Checkout") {
-            steps {
-                checkout scm
-            }
+            steps { checkout scm }
         }
 
-        /* ===============================
-               PYTHON TESTING
-        =============================== */
         stage("Install & Test Python Code") {
             steps {
                 sh """
@@ -41,9 +31,6 @@ pipeline {
             }
         }
 
-        /* ===============================
-               SONAR SCAN
-        =============================== */
         stage("SonarQube Analysis") {
             steps {
                 echo "⚡ Running Sonar Scan (errors will NOT fail pipeline)"
@@ -67,18 +54,10 @@ pipeline {
             }
         }
 
-        /* ===============================
-               SKIP QUALITY GATE 
-        =============================== */
         stage("Skip Quality Gate") {
-            steps {
-                echo "⏭️ Quality Gate skipped (Python project)."
-            }
+            steps { echo "⏭️ Quality Gate skipped (Python project)." }
         }
 
-        /* ===============================
-               DOCKER BUILD
-        =============================== */
         stage("Docker Build") {
             steps {
                 sh """
@@ -92,9 +71,6 @@ pipeline {
             }
         }
 
-        /* ===============================
-               DOCKER PUSH
-        =============================== */
         stage("Docker Push") {
             steps {
                 withCredentials([usernamePassword(
@@ -104,19 +80,14 @@ pipeline {
                 )]) {
                     sh """
                         echo "${PASS}" | docker login ${DOCKER_REGISTRY} -u "${USER}" --password-stdin
-
                         docker push ${DOCKER_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}
                         docker push ${DOCKER_REGISTRY}/${IMAGE_NAME}:latest
-
                         docker logout ${DOCKER_REGISTRY}
                     """
                 }
             }
         }
 
-        /* ===============================
-               DOCKER PULL (verification)
-        =============================== */
         stage("Verify Pull From Registry") {
             steps {
                 sh """
@@ -127,11 +98,7 @@ pipeline {
     }
 
     post {
-        success {
-            echo "🎉 Pipeline SUCCESS!"
-        }
-        failure {
-            echo "❌ Pipeline FAILED — Fix errors."
-        }
+        success { echo "🎉 Pipeline SUCCESS!" }
+        failure { echo "❌ Pipeline FAILED — Fix errors." }
     }
 }
