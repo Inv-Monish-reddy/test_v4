@@ -40,10 +40,10 @@ pipeline {
                             -w /src \
                             sonarsource/sonar-scanner-cli:4.6 \
                             sonar-scanner \
-                                -Dsonar.projectKey=test_v4 \
-                                -Dsonar.sources=backend \
-                                -Dsonar.host.url=${SONAR_HOST_URL} \
-                                -Dsonar.login=${SONAR_TOKEN}
+                                -Dsonar.projectKey=test_v3 \
+                                -Dsonar.sources=. \
+                                -Dsonar.host.url=https://v2code.rtwohealthcare.com \
+                                -Dsonar.token=sqp_ab4016bc5eef902acdbc5f5dbf8f0d46815f0035
                     """
                 }
             }
