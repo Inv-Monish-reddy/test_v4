@@ -1,1 +1,2 @@
-print("Hello from production CI/CD!")
+def hello():
+    return "Hello World"
