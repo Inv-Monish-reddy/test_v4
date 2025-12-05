@@ -25,23 +25,50 @@ pipeline {
                         -v \$PWD/backend:/app \
                         -w /app python:3.10-slim sh -c "
                             pip install -r requirements.txt &&
-                            pytest --cov=. --cov-report=term --disable-warnings --maxfail=1
+                            pytest --disable-warnings --maxfail=1
                         "
                 """
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv("SonarQube") {
+                    sh """
+                        docker run --rm \
+                            -v \$PWD:/src \
+                            -w /src sonarsource/sonar-scanner-cli:4.6 \
+                            sonar-scanner \
+                                -Dsonar.projectKey=test_v4 \
+                                -Dsonar.sources=backend \
+                                -Dsonar.host.url=${SONAR_HOST_URL} \
+                                -Dsonar.login=${SONAR_TOKEN}
+                    """
+                }
             }
         }
 
         stage('Verify Coverage >= 80%') {
             steps {
                 script {
+                    // Run coverage AGAIN in a fresh container WITH deps installed
                     def covOutput = sh(
-                        script: "docker run --rm -v \$PWD/backend:/app -w /app python:3.10-slim sh -c \"pytest --cov=. --cov-report=term | grep TOTAL\"",
+                        script: """
+                            docker run --rm \
+                                -v \$PWD/backend:/app \
+                                -w /app python:3.10-slim sh -c '
+                                    pip install -r requirements.txt >/dev/null 2>&1 &&
+                                    pytest --cov=. --cov-report=term --disable-warnings --maxfail=1 | grep TOTAL
+                                '
+                        """,
                         returnStdout: true
                     ).trim()
 
                     echo "Coverage Output: ${covOutput}"
 
-                    def percentage = covOutput.tokenize()[3].replace('%','') as Integer
+                    // Example line: "TOTAL                3      1    67%"
+                    def percentageStr = covOutput.tokenize().last().replace("%","")
+                    def percentage = percentageStr as Integer
 
                     if (percentage < 80) {
                         error "❌ Coverage ${percentage}% < 80% (FAIL)"
@@ -52,26 +79,9 @@ pipeline {
             }
         }
 
-        stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv("SonarQube") {
-                    sh """
-                        docker run --rm \
-                           -v \$PWD:/src \
-                           -w /src sonarsource/sonar-scanner-cli:4.6 \
-                           sonar-scanner \
-                               -Dsonar.projectKey=test_v4 \
-                               -Dsonar.sources=backend \
-                               -Dsonar.host.url=${SONAR_HOST_URL} \
-                               -Dsonar.login=${SONAR_TOKEN}
-                    """
-                }
-            }
-        }
-
         stage('Skip Quality Gate') {
             steps {
-                echo "⏭️ Quality Gate skipped intentionally."
+                echo "⏭️ Quality Gate skipped intentionally (Sonar server gate not enforced in Jenkins)."
             }
         }
 
