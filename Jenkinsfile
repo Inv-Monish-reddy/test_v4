@@ -3,9 +3,12 @@ pipeline {
 
     environment {
         SONAR_HOST_URL = "https://v2code.rtwohealthcare.com"
-        SONAR_TOKEN    = "sqp_ab4016bc5eef902acdbc5f5dbf8f0d46815f0035"
+        SONAR_TOKEN = "sqp_ab4016bc5eef902acdbc5f5dbf8f0d46815f0035"
 
         DOCKER_REGISTRY_URL = "v2deploy.rtwohealthcare.com"
+        REGISTRY_PATH = "/docker-hosted"
+        REGISTRY_HOST = "${DOCKER_REGISTRY_URL}${REGISTRY_PATH}"
+
         IMAGE_NAME = "test-v4"
         IMAGE_TAG  = "v${BUILD_NUMBER}"
     }
@@ -18,70 +21,59 @@ pipeline {
             }
         }
 
-        stage('Install & Test Python Code') {
+        stage('Install + Test + Coverage') {
             steps {
                 sh """
                     docker run --rm \
-                        -v \$PWD/backend:/app \
-                        -w /app python:3.10-slim sh -c "
+                        -v $WORKSPACE/backend:/app \
+                        -w /app python:3.10-slim \
+                        sh -c "
                             pip install -r requirements.txt &&
-                            pytest --disable-warnings --maxfail=1
+                            pytest --cov=. --cov-report=xml --disable-warnings --maxfail=1
                         "
                 """
-            }
-        }
-
-        stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv("SonarQube") {
-                    sh """
-                        docker run --rm \
-                            -v \$PWD:/src \
-                            -w /src sonarsource/sonar-scanner-cli:4.6 \
-                            sonar-scanner \
-                                -Dsonar.projectKey=test_v4 \
-                                -Dsonar.sources=backend \
-                                -Dsonar.host.url=${SONAR_HOST_URL} \
-                                -Dsonar.login=${SONAR_TOKEN}
-                    """
-                }
             }
         }
 
         stage('Verify Coverage >= 80%') {
             steps {
                 script {
-                    // Run coverage AGAIN in a fresh container WITH deps installed
-                    def covOutput = sh(
-                        script: """
-                            docker run --rm \
-                                -v \$PWD/backend:/app \
-                                -w /app python:3.10-slim sh -c '
-                                    pip install -r requirements.txt >/dev/null 2>&1 &&
-                                    pytest --cov=. --cov-report=term --disable-warnings --maxfail=1 | grep TOTAL
-                                '
-                        """,
+                    def cov = sh(
+                        script: "grep '<coverage ' backend/coverage.xml | sed -E 's/.*line-rate=\"([0-9\\.]+)\".*/\\1/'",
                         returnStdout: true
                     ).trim()
 
-                    echo "Coverage Output: ${covOutput}"
+                    def percent = (cov.toFloat() * 100).toInteger()
+                    echo "Coverage: ${percent}%"
 
-                    // Example line: "TOTAL                3      1    67%"
-                    def percentageStr = covOutput.tokenize().last().replace("%","")
-                    def percentage = percentageStr as Integer
-
-                    if (percentage < 80) {
-                        error "❌ Coverage ${percentage}% < 80% (FAIL)"
-                    } else {
-                        echo "✅ Coverage OK: ${percentage}%"
+                    if (percent < 80) {
+                        error "Coverage below 80%. Failing pipeline."
                     }
+                }
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh """
+                        docker run --rm \
+                            -v $WORKSPACE:/src \
+                            -w /src sonarsource/sonar-scanner-cli:4.6 \
+                            sonar-scanner \
+                                -Dsonar.projectKey=test_v3 \
+                                -Dsonar.sources=backend \
+                                -Dsonar.python.coverage.reportPaths=backend/coverage.xml \
+                                -Dsonar.host.url=${SONAR_HOST_URL} \
+                                -Dsonar.token=${SONAR_TOKEN}
+                    """
                 }
             }
         }
 
         stage('Skip Quality Gate') {
             steps {
-                echo "⏭️ Quality Gate skipped intentionally (Sonar server gate not enforced in Jenkins)."
+                echo "Python project — Quality Gate manually skipped."
             }
         }
 
@@ -90,8 +82,8 @@ pipeline {
                 sh """
                     cd backend
                     docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
-                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${DOCKER_REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG}
-                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${DOCKER_REGISTRY_URL}/${IMAGE_NAME}:latest
+                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${REGISTRY_HOST}/${IMAGE_NAME}:${IMAGE_TAG}
+                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${REGISTRY_HOST}/${IMAGE_NAME}:latest
                 """
             }
         }
@@ -106,8 +98,8 @@ pipeline {
                     sh """
                         echo "$PASS" | docker login ${DOCKER_REGISTRY_URL} -u "$USER" --password-stdin
 
-                        docker push ${DOCKER_REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG}
-                        docker push ${DOCKER_REGISTRY_URL}/${IMAGE_NAME}:latest
+                        docker push ${REGISTRY_HOST}/${IMAGE_NAME}:${IMAGE_TAG}
+                        docker push ${REGISTRY_HOST}/${IMAGE_NAME}:latest
 
                         docker logout ${DOCKER_REGISTRY_URL}
                     """
@@ -117,17 +109,8 @@ pipeline {
 
         stage('Verify Pull From Registry') {
             steps {
-                sh "docker pull ${DOCKER_REGISTRY_URL}/${IMAGE_NAME}:${IMAGE_TAG}"
+                sh "docker pull ${REGISTRY_HOST}/${IMAGE_NAME}:${IMAGE_TAG}"
             }
-        }
-    }
-
-    post {
-        failure {
-            echo "❌ Pipeline FAILED — Fix errors."
-        }
-        success {
-            echo "✅ Pipeline SUCCESS — All steps passed."
         }
     }
 }
