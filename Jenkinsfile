@@ -5,8 +5,8 @@ pipeline {
         SONAR_HOST_URL = "https://v2code.rtwohealthcare.com"
         SONAR_TOKEN = "sqp_ab4016bc5eef902acdbc5f5dbf8f0d46815f0035"
 
-        DOCKER_REGISTRY_URL = "v2deploy.rtwohealthcare.com"
-        REGISTRY_CREDENTIALS = 'docker-repo'
+        DOCKER_REGISTRY = "v2deploy.rtwohealthcare.com"
+        DOCKER_REPO     = "test_v4"
         REGISTRY_HOST = "${DOCKER_REGISTRY_URL}${REGISTRY_PATH}"
 
         IMAGE_NAME = "test-v4"
@@ -69,9 +69,9 @@ pipeline {
         stage('Docker Push') {
             steps {
                 withCredentials([usernamePassword(
-                    credentialsId: 'nexus-docker-cred',
-                    usernameVariable: 'USER',
-                    passwordVariable: 'PASS'
+                    credentialsId: 'docker-repo',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
                 )]) {
                     sh """
                         echo "$PASS" | docker login ${DOCKER_REGISTRY_URL} -u "$USER" --password-stdin
