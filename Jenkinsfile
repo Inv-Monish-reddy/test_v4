@@ -2,12 +2,12 @@ pipeline {
     agent any
 
     environment {
-        // -------- SONAR --------
         SONAR_HOST_URL = "https://v2code.rtwohealthcare.com"
+        SONAR_TOKEN = "sqp_ab4016bc5eef902acdbc5f5dbf8f0d46815f0035"
 
-        // -------- DOCKER / NEXUS --------
         DOCKER_REGISTRY = "v2deploy.rtwohealthcare.com"
         DOCKER_REPO     = "test_v4"
+        REGISTRY_HOST = "${DOCKER_REGISTRY_URL}${REGISTRY_PATH}"
 
         IMAGE_NAME = "test-v4"
         IMAGE_TAG  = "v${BUILD_NUMBER}"
@@ -16,39 +16,35 @@ pipeline {
     stages {
 
         stage('Checkout') {
-            steps {
-                checkout scm
-            }
+            steps { checkout scm }
         }
 
-        stage('Install + Test (Python)') {
+        stage('Install + Test (No Coverage Check)') {
             steps {
-                sh '''
+                sh """
                     docker run --rm \
-                      -v ${WORKSPACE}/backend:/app \
-                      -w /app \
-                      python:3.10-slim \
-                      sh -c "pip install -r requirements.txt && pytest --disable-warnings --maxfail=1"
-                '''
+                        -v ${WORKSPACE}/backend:/app \
+                        -w /app \
+                        python:3.10-slim \
+                        sh -c "pip install -r requirements.txt && pytest --disable-warnings --maxfail=1"
+                """
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-                    withSonarQubeEnv('SonarQube') {
-                        sh '''
-                            docker run --rm --network=host \
-                              -v ${WORKSPACE}:/src \
-                              -w /src \
-                              sonarsource/sonar-scanner-cli:5 \
-                              sonar-scanner \
-                                -Dsonar.projectKey=test_v4 \
+                withSonarQubeEnv('SonarQube') {
+                    sh """
+                        docker run --rm --network=host \
+                            -v ${WORKSPACE}:/src \
+                            -w /src \
+                            sonarsource/sonar-scanner-cli:5 \
+                            sonar-scanner \
+                                -Dsonar.projectKey=test_v3 \
                                 -Dsonar.sources=backend \
                                 -Dsonar.host.url=${SONAR_HOST_URL} \
                                 -Dsonar.token=${SONAR_TOKEN}
-                        '''
-                    }
+                    """
                 }
             }
         }
@@ -61,17 +57,12 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                sh '''
+                sh """
                     cd backend
-
                     docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
-
-                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} \
-                      ${DOCKER_REGISTRY}/${DOCKER_REPO}/${IMAGE_NAME}:${IMAGE_TAG}
-
-                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} \
-                      ${DOCKER_REGISTRY}/${DOCKER_REPO}/${IMAGE_NAME}:latest
-                '''
+                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${REGISTRY_HOST}/${IMAGE_NAME}:${IMAGE_TAG}
+                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${REGISTRY_HOST}/${IMAGE_NAME}:latest
+                """
             }
         }
 
@@ -82,37 +73,22 @@ pipeline {
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
-                    sh '''
-                        echo "$DOCKER_PASS" | docker login ${DOCKER_REGISTRY} \
-                          -u "$DOCKER_USER" --password-stdin
-
-                        docker push ${DOCKER_REGISTRY}/${DOCKER_REPO}/${IMAGE_NAME}:${IMAGE_TAG}
-                        docker push ${DOCKER_REGISTRY}/${DOCKER_REPO}/${IMAGE_NAME}:latest
-
-                        docker logout ${DOCKER_REGISTRY}
-                    '''
+                    sh """
+                        echo "$PASS" | docker login ${DOCKER_REGISTRY_URL} -u "$USER" --password-stdin
+                        docker push ${REGISTRY_HOST}/${IMAGE_NAME}:${IMAGE_TAG}
+                        docker push ${REGISTRY_HOST}/${IMAGE_NAME}:latest
+                        docker logout ${DOCKER_REGISTRY_URL}
+                    """
                 }
             }
         }
 
         stage('Verify Pull From Registry') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'docker-repo',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-                    sh '''
-                        echo "$DOCKER_PASS" | docker login ${DOCKER_REGISTRY} \
-                          -u "$DOCKER_USER" --password-stdin
-
-                        docker pull ${DOCKER_REGISTRY}/${DOCKER_REPO}/${IMAGE_NAME}:${IMAGE_TAG}
-
-                        docker logout ${DOCKER_REGISTRY}
-
-                        echo "Pull test successful."
-                    '''
-                }
+                sh """
+                    docker pull ${REGISTRY_HOST}/${IMAGE_NAME}:${IMAGE_TAG}
+                    echo "Pull test successful."
+                """
             }
         }
     }
