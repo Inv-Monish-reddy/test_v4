@@ -6,7 +6,7 @@ pipeline {
         SONAR_TOKEN = "sqp_ab4016bc5eef902acdbc5f5dbf8f0d46815f0035"
 
         DOCKER_REGISTRY_URL = "v2deploy.rtwohealthcare.com"
-        REGISTRY_PATH = "/docker-hosted"
+        REGISTRY_CREDENTIALS = 'docker-repo'
         REGISTRY_HOST = "${DOCKER_REGISTRY_URL}${REGISTRY_PATH}"
 
         IMAGE_NAME = "test-v4"
