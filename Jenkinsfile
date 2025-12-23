@@ -7,7 +7,6 @@ pipeline {
 
         DOCKER_REGISTRY = "v2deploy.rtwohealthcare.com"
         DOCKER_REPO     = "test_v4"
-        REGISTRY_HOST = "${DOCKER_REGISTRY_URL}${REGISTRY_PATH}"
 
         IMAGE_NAME = "test-v4"
         IMAGE_TAG  = "v${BUILD_NUMBER}"
@@ -60,8 +59,8 @@ pipeline {
                 sh """
                     cd backend
                     docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
-                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${REGISTRY_HOST}/${IMAGE_NAME}:${IMAGE_TAG}
-                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${REGISTRY_HOST}/${IMAGE_NAME}:latest
+                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${DOCKER_REGISTRY}/${DOCKER_REPO}/${IMAGE_NAME}:${IMAGE_TAG}
+                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${DOCKER_REPO}/${IMAGE_NAME}:latest
                 """
             }
         }
@@ -74,10 +73,10 @@ pipeline {
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
                     sh """
-                        echo "$PASS" | docker login ${DOCKER_REGISTRY_URL} -u "$USER" --password-stdin
-                        docker push ${REGISTRY_HOST}/${IMAGE_NAME}:${IMAGE_TAG}
-                        docker push ${REGISTRY_HOST}/${IMAGE_NAME}:latest
-                        docker logout ${DOCKER_REGISTRY_URL}
+                        echo "$PASS" | docker login ${DOCKER_REGISTRY} -u "$USER" --password-stdin
+                        docker push ${DOCKER_REPO}/${IMAGE_NAME}:${IMAGE_TAG}
+                        docker push ${DOCKER_REPO}/${IMAGE_NAME}:latest
+                        docker logout ${DOCKER_REGISTRY}
                     """
                 }
             }
@@ -86,7 +85,7 @@ pipeline {
         stage('Verify Pull From Registry') {
             steps {
                 sh """
-                    docker pull ${REGISTRY_HOST}/${IMAGE_NAME}:${IMAGE_TAG}
+                    docker pull ${DOCKER_REPO}/${IMAGE_NAME}:${IMAGE_TAG}
                     echo "Pull test successful."
                 """
             }
