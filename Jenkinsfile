@@ -54,13 +54,19 @@ pipeline {
             }
         }
 
+        /* ---------------- DOCKER FIXES START ---------------- */
+
         stage('Docker Build') {
             steps {
                 sh """
                     cd backend
                     docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
-                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${DOCKER_REGISTRY}/${DOCKER_REPO}/${IMAGE_NAME}:${IMAGE_TAG}
-                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${DOCKER_REPO}/${IMAGE_NAME}:latest
+
+                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} \
+                      ${DOCKER_REGISTRY}/${DOCKER_REPO}/${IMAGE_NAME}:${IMAGE_TAG}
+
+                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} \
+                      ${DOCKER_REGISTRY}/${DOCKER_REPO}/${IMAGE_NAME}:latest
                 """
             }
         }
@@ -73,9 +79,12 @@ pipeline {
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
                     sh """
-                        echo "$PASS" | docker login ${DOCKER_REGISTRY} -u "$USER" --password-stdin
-                        docker push ${DOCKER_REPO}/${IMAGE_NAME}:${IMAGE_TAG}
-                        docker push ${DOCKER_REPO}/${IMAGE_NAME}:latest
+                        echo "$DOCKER_PASS" | docker login ${DOCKER_REGISTRY} \
+                          -u "$DOCKER_USER" --password-stdin
+
+                        docker push ${DOCKER_REGISTRY}/${DOCKER_REPO}/${IMAGE_NAME}:${IMAGE_TAG}
+                        docker push ${DOCKER_REGISTRY}/${DOCKER_REPO}/${IMAGE_NAME}:latest
+
                         docker logout ${DOCKER_REGISTRY}
                     """
                 }
@@ -84,11 +93,25 @@ pipeline {
 
         stage('Verify Pull From Registry') {
             steps {
-                sh """
-                    docker pull ${DOCKER_REPO}/${IMAGE_NAME}:${IMAGE_TAG}
-                    echo "Pull test successful."
-                """
+                withCredentials([usernamePassword(
+                    credentialsId: 'docker-repo',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh """
+                        echo "$DOCKER_PASS" | docker login ${DOCKER_REGISTRY} \
+                          -u "$DOCKER_USER" --password-stdin
+
+                        docker pull ${DOCKER_REGISTRY}/${DOCKER_REPO}/${IMAGE_NAME}:${IMAGE_TAG}
+
+                        docker logout ${DOCKER_REGISTRY}
+
+                        echo "Pull test successful."
+                    """
+                }
             }
         }
+
+        /* ---------------- DOCKER FIXES END ---------------- */
     }
 }
